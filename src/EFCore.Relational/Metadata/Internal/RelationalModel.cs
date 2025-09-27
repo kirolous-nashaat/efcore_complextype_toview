@@ -634,12 +634,12 @@ public class RelationalModel : Annotatable, IRelationalModel
     private static void CreateContainerColumn<TColumnMappingBase>(
         TableBase tableBase,
         string containerColumnName,
-        IEntityType mappedType,
+        ITypeBase mappedType,
         IRelationalTypeMappingSource relationalTypeMappingSource,
         Func<string, TableBase, RelationalTypeMapping, ColumnBase<TColumnMappingBase>> createColumn)
         where TColumnMappingBase : class, IColumnMappingBase
     {
-        var ownership = mappedType.GetForeignKeys().Single(fk => fk.IsOwnership);
+        var ownership = ((IEntityType)mappedType).GetForeignKeys().Single(fk => fk.IsOwnership);
         if (!ownership.PrincipalEntityType.IsMappedToJson())
         {
             Check.DebugAssert(tableBase.FindColumn(containerColumnName) == null, $"Table does not have column '{containerColumnName}'.");
@@ -727,8 +727,8 @@ public class RelationalModel : Annotatable, IRelationalModel
 
     private static void CreateViewMapping(
         IRelationalTypeMappingSource relationalTypeMappingSource,
-        IEntityType entityType,
-        IEntityType mappedType,
+        ITypeBase entityType,
+        ITypeBase mappedType,
         StoreObjectIdentifier mappedView,
         RelationalModel databaseModel,
         List<ViewMapping> viewMappings,
@@ -778,6 +778,23 @@ public class RelationalModel : Annotatable, IRelationalModel
                 }
 
                 CreateViewColumnMapping(column, property, viewMapping);
+            }
+
+            foreach (var complexProperty in mappedType.GetDeclaredComplexProperties())
+            {
+                var complexType = complexProperty.ComplexType;
+                var complexViewMappings = new List<ViewMapping>();
+                complexType.SetRuntimeAnnotation(RelationalAnnotationNames.ViewMappings, complexViewMappings);
+
+                CreateViewMapping(
+                    relationalTypeMappingSource,
+                    complexType,
+                    complexType,
+                    mappedView,
+                    databaseModel,
+                    complexViewMappings,
+                    includesDerivedTypes: true,
+                    isSplitEntityTypePrincipal: isSplitEntityTypePrincipal == true ? false : isSplitEntityTypePrincipal);
             }
         }
 
